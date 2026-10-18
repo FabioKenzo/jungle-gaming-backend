@@ -7,6 +7,7 @@ import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { WalletEntity } from './wallet/infrastructure/persistence/wallet.entity';
 import { WalletTransactionEntity } from './wallet/infrastructure/persistence/transaction/wallet-transaction.entity';
+import { WageringTransactionEntity } from './wagering/infrastructure/persistence/wagering-transaction.entity';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { WalletTransactionEntity } from './wallet/infrastructure/persistence/tra
         user: config.getOrThrow<string>('DB_USER'),
         password: config.getOrThrow<string>('DB_PASSWORD'),
         dbName: config.getOrThrow<string>('DB_NAME'),
-        entities: [WalletEntity, WalletTransactionEntity],
+        entities: [WalletEntity, WalletTransactionEntity, WageringTransactionEntity],
       }),
     }),
 

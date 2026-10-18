@@ -7,6 +7,7 @@ import { WalletMapper } from './infrastructure/persistence/wallet.mapper';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { WalletTransactionRepository } from './infrastructure/persistence/transaction/wallet-transaction.repository';
 import { BadRequestException } from '@nestjs/common';
+import { WageringTransactionRepository } from '../wagering/infrastructure/persistence/wagering-transaction.repository';
 
 
 @Injectable()
@@ -14,6 +15,7 @@ export class WalletService {
     constructor(
         private readonly walletRepository: WalletRepository,
         private readonly walletTransactionRepository: WalletTransactionRepository,
+        private readonly wageringTransactionRepository: WageringTransactionRepository,
     ) { }
 
 
@@ -57,12 +59,30 @@ export class WalletService {
                         wallet,
                     );
 
-                    //saldo inicial positivo gera um credito no ledger
+
+                    //saldo inicial positivo gera OPENING e CREDIT no ledger
                     if (money.toJSON().amount !== '0.00') {
+
+                        //cria a transacao financeira OPENING
+                        const openingTransaction =
+                            await this.wageringTransactionRepository.create(
+                                entityManager,
+                                {
+                                    walletId: wallet.id,
+                                    playerId: playerId,
+                                    currency: money.currency,
+                                    type: 'OPENING',
+                                    amount: money.toJSON().amount,
+                                    idempotencyKey: `opening:${wallet.id}`,
+                                },
+                            );
+
+                        //registra o credito vinculado ao OPENING
                         await this.walletTransactionRepository.create(
                             entityManager,
                             {
                                 walletId: wallet.id,
+                                transactionId: openingTransaction.id,
                                 type: 'CREDIT',
                                 amount: money.toJSON().amount,
                                 balanceAfter: wallet.getBalance().toJSON().amount,
@@ -72,6 +92,7 @@ export class WalletService {
                             },
                         );
                     }
+
                 },
             );
         } catch (error) {

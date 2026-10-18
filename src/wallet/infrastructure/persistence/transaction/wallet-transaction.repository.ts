@@ -9,6 +9,7 @@ export type WalletTransactionType = 'CREDIT' | 'DEBIT';
 
 export interface CreateWalletTransaction {
     walletId: string;
+    transactionId?: string;
     type: WalletTransactionType;
     amount: string;
     balanceAfter: string;
@@ -34,7 +35,8 @@ export class WalletTransactionRepository {
                 versionAfter: data.versionAfter,
                 idempotencyKey: data.idempotencyKey,
                 createdAt: new Date(),
-                walletUpdatedAt: data.walletUpdatedAt
+                walletUpdatedAt: data.walletUpdatedAt,
+                transactionId: data.transactionId ?? null
             },
         );
 

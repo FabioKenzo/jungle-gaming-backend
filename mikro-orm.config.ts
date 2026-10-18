@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import { defineConfig } from '@mikro-orm/postgresql';
 import { Migrator } from '@mikro-orm/migrations';
+
 import { WalletEntity } from './src/wallet/infrastructure/persistence/wallet.entity';
 import { WalletTransactionEntity } from './src/wallet/infrastructure/persistence/transaction/wallet-transaction.entity';
+import { WageringTransactionEntity } from './src/wagering/infrastructure/persistence/wagering-transaction.entity';
 
 export default defineConfig({
     host: process.env.DB_HOST ?? 'localhost',
@@ -11,7 +13,11 @@ export default defineConfig({
     password: process.env.DB_PASSWORD,
     dbName: process.env.DB_NAME,
 
-    entities: [WalletEntity, WalletTransactionEntity],
+    entities: [
+        WalletEntity,
+        WalletTransactionEntity,
+        WageringTransactionEntity,
+    ],
 
     extensions: [Migrator],
 
@@ -21,3 +27,4 @@ export default defineConfig({
         tableName: 'mikro_orm_migrations',
     },
 });
+

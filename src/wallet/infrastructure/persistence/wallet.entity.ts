@@ -17,7 +17,7 @@ export class WalletEntity {
     @Property({ type: 'decimal', precision: 20, scale: 2 })
     balance!: string;
 
-    @Property({ type: 'integer', default: 0 })
+    @Property({ type: 'integer', default: 1 })
     version!: number;
 
     @Property({ type: 'datetime' })

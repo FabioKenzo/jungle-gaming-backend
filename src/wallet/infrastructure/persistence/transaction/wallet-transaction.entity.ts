@@ -30,4 +30,7 @@ export class WalletTransactionEntity {
 
     @Property({ type: 'datetime' })
     createdAt!: Date;
+
+    @Property({ type: 'uuid', nullable: true })
+    transactionId?: string | null;
 }
