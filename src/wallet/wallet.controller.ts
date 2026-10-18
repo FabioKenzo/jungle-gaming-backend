@@ -16,7 +16,7 @@ export class WalletController {
     async openWallet(@Body() body: OpenWalletDto) {
         const wallet = await this.walletService.openWallet(
             body.playerId,
-            body.currency,
+            body.initialBalance,
         );
 
         return {

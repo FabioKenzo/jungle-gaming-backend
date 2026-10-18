@@ -14,24 +14,32 @@ export class Wallet {
         private updatedAt: Date,
     ) { }
 
-    static open(playerId: string, currency: string): Wallet {
+
+    static open(
+        playerId: string,
+        initialBalance: Money,
+    ): Wallet {
         if (!playerId) {
             throw new Error('O identificador do jogador é obrigatório.');
         }
 
-        const initialBalance = Money.zero(currency);
+        if (initialBalance.isNegative()) {
+            throw new Error('O saldo inicial não pode ser negativo.');
+        }
+
         const now = new Date();
 
         return new Wallet(
             randomUUID(),
             playerId,
-            currency,
+            initialBalance.currency,
             initialBalance,
-            0,
+            1,
             now,
             now,
         );
     }
+
 
     static rehydrate(props: {
         id: string;

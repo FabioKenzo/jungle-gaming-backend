@@ -16,15 +16,27 @@ export class WalletService {
         private readonly walletTransactionRepository: WalletTransactionRepository,
     ) { }
 
-    //abre uma nova carteira para o jogador
+
+    //abre uma carteira com saldo inicial
     async openWallet(
         playerId: string,
-        currency: string,
+        initialBalance: {
+            amount: string;
+            currency: string;
+        },
     ): Promise<Wallet> {
+        const money = Money.from(initialBalance);
+
+        if (money.isNegative()) {
+            throw new BadRequestException(
+                'O saldo inicial não pode ser negativo.',
+            );
+        }
+
         const existingWallet =
             await this.walletRepository.findByPlayerAndCurrency(
                 playerId,
-                currency,
+                money.currency,
             );
 
         if (existingWallet) {
@@ -33,11 +45,35 @@ export class WalletService {
             );
         }
 
-        const wallet = Wallet.open(playerId, currency);
-
+        const wallet = Wallet.open(playerId, money);
 
         try {
-            await this.walletRepository.create(wallet);
+            await this.walletRepository.executeInTransaction(
+                async (entityManager) => {
+
+                    //cria a carteira dentro da transacap
+                    await this.walletRepository.createInTransaction(
+                        entityManager,
+                        wallet,
+                    );
+
+                    //saldo inicial positivo gera um credito no ledger
+                    if (money.toJSON().amount !== '0.00') {
+                        await this.walletTransactionRepository.create(
+                            entityManager,
+                            {
+                                walletId: wallet.id,
+                                type: 'CREDIT',
+                                amount: money.toJSON().amount,
+                                balanceAfter: wallet.getBalance().toJSON().amount,
+                                versionAfter: wallet.getVersion(),
+                                walletUpdatedAt: wallet.getUpdatedAt(),
+                                idempotencyKey: `opening:${wallet.id}`,
+                            },
+                        );
+                    }
+                },
+            );
         } catch (error) {
             if (error instanceof UniqueConstraintViolationException) {
                 throw new ConflictException(
@@ -49,8 +85,8 @@ export class WalletService {
         }
 
         return wallet;
-
     }
+
 
     //consulta uma carteira existente
     async getWallet(
@@ -92,104 +128,118 @@ export class WalletService {
             );
         }
 
-        return this.walletRepository.executeInTransaction(
-            async (entityManager) => {
+        try {
+            return await this.walletRepository.executeInTransaction(
+                async (entityManager) => {
 
-                //bloqueia a carteira durante a movimentacao
-                const entity =
-                    await this.walletRepository.findByPlayerAndCurrencyForUpdate(
-                        entityManager,
-                        playerId,
+                    //bloqueia a carteira durante a movimentacao
+                    const entity =
+                        await this.walletRepository.findByPlayerAndCurrencyForUpdate(
+                            entityManager,
+                            playerId,
+                            currency,
+                        );
+
+                    if (!entity) {
+                        throw new NotFoundException(
+                            'Carteira não encontrada para este jogador e moeda.',
+                        );
+                    }
+
+                    const wallet = WalletMapper.toDomain(entity);
+
+                    const money = Money.from({
+                        amount,
                         currency,
-                    );
-
-                if (!entity) {
-                    throw new NotFoundException(
-                        'Carteira não encontrada para este jogador e moeda.',
-                    );
-                }
-
-                const wallet = WalletMapper.toDomain(entity);
-
-                const money = Money.from({
-                    amount,
-                    currency,
-                });
-
-                //consulta uma operacao anterior com a mesma chave
-                const existingTransaction =
-                    await this.walletTransactionRepository.findByIdempotencyKey(
-                        entityManager,
-                        idempotencyKey,
-                    );
-
-                if (existingTransaction) {
-
-                    const sameOperation =
-                        existingTransaction.walletId === wallet.id &&
-                        existingTransaction.type === 'CREDIT' &&
-                        existingTransaction.amount === money.toJSON().amount;
-
-                    if (!sameOperation) {
-                        throw new ConflictException(
-                            'A chave de idempotência já foi utilizada com dados diferentes.',
-                        );
-                    }
-
-
-                    if (!existingTransaction.walletUpdatedAt) {
-                        throw new ConflictException(
-                            'Esta operação já foi processada, mas seu resultado histórico não está disponível.',
-                        );
-                    }
-
-                    //retorna o resultado original sem executar outro credito
-                    return Wallet.rehydrate({
-                        id: wallet.id,
-                        playerId: wallet.playerId,
-                        currency: wallet.currency,
-                        balance: Money.from({
-                            amount: existingTransaction.balanceAfter,
-                            currency: wallet.currency,
-                        }),
-                        version: existingTransaction.versionAfter,
-                        createdAt: wallet.createdAt,
-                        updatedAt: existingTransaction.walletUpdatedAt,
                     });
-                }
 
-                //executa o credito uma enica vez
-                wallet.credit(money);
+                    //consulta uma operacao anterior com a mesma chave
+                    const existingTransaction =
+                        await this.walletTransactionRepository.findByIdempotencyKey(
+                            entityManager,
+                            idempotencyKey,
+                        );
 
-                //atualiza o saldo da carteira
-                await this.walletRepository.updateBalance(
-                    entityManager,
-                    entity,
-                    wallet,
+                    if (existingTransaction) {
+
+                        const sameOperation =
+                            existingTransaction.walletId === wallet.id &&
+                            existingTransaction.type === 'CREDIT' &&
+                            existingTransaction.amount === money.toJSON().amount;
+
+                        if (!sameOperation) {
+                            throw new ConflictException(
+                                'A chave de idempotência já foi utilizada com dados diferentes.',
+                            );
+                        }
+
+                        //verifica se existe resultado historico
+                        if (!existingTransaction.walletUpdatedAt) {
+                            throw new ConflictException(
+                                'Esta operação já foi processada, mas seu resultado histórico não está disponível.',
+                            );
+                        }
+
+                        //retorna o resultado original sem executar outro credito
+                        return Wallet.rehydrate({
+                            id: wallet.id,
+                            playerId: wallet.playerId,
+                            currency: wallet.currency,
+                            balance: Money.from({
+                                amount: existingTransaction.balanceAfter,
+                                currency: wallet.currency,
+                            }),
+                            version: existingTransaction.versionAfter,
+                            createdAt: wallet.createdAt,
+                            updatedAt: existingTransaction.walletUpdatedAt,
+                        });
+                    }
+
+                    //executa o credito
+                    wallet.credit(money);
+
+                    //atualiza o saldo da carteira
+                    await this.walletRepository.updateBalance(
+                        entityManager,
+                        entity,
+                        wallet,
+                    );
+
+                    //registra a movimentacao no ledger
+                    await this.walletTransactionRepository.create(
+                        entityManager,
+                        {
+                            walletId: wallet.id,
+                            type: 'CREDIT',
+                            amount: money.toJSON().amount,
+                            balanceAfter: wallet.getBalance().toJSON().amount,
+                            versionAfter: wallet.getVersion(),
+                            walletUpdatedAt: wallet.getUpdatedAt(),
+                            idempotencyKey,
+                        },
+                    );
+
+                    return wallet;
+                },
+            );
+
+        } catch (error) {
+
+            //trata conflito de chave unica no banco
+            if (error instanceof UniqueConstraintViolationException) {
+                throw new ConflictException(
+                    'A chave de idempotência já foi utilizada por outra operação.',
                 );
+            }
 
-                //registra a movimentacao no ledger
-                await this.walletTransactionRepository.create(
-                    entityManager,
-                    {
-                        walletId: wallet.id,
-                        type: 'CREDIT',
-                        amount: money.toJSON().amount,
-                        balanceAfter: wallet.getBalance().toJSON().amount,
-                        versionAfter: wallet.getVersion(),
-                        idempotencyKey,
-                        walletUpdatedAt: wallet.getUpdatedAt()
-                    },
-                );
-
-                return wallet;
-            },
-        );
+            //joga os demais erros
+            throw error;
+        }
     }
 
 
 
-    //metodo de debito
+    //metodo debito
     async debit(
         playerId: string,
         currency: string,
@@ -197,7 +247,7 @@ export class WalletService {
         idempotencyKey: string,
     ): Promise<Wallet> {
 
-        //valida a chave antes de iniciar a transacao
+        //valida a chave antes de iniciar a transacap
         if (
             !idempotencyKey ||
             idempotencyKey.trim().length === 0 ||
@@ -208,117 +258,129 @@ export class WalletService {
             );
         }
 
-        return this.walletRepository.executeInTransaction(
-            async (entityManager) => {
+        try {
+            return await this.walletRepository.executeInTransaction(
+                async (entityManager) => {
 
-                //bloqueia a carteira durante a movimentacao
-                const entity =
-                    await this.walletRepository.findByPlayerAndCurrencyForUpdate(
-                        entityManager,
-                        playerId,
+                    //bloqueia a carteira durante a movimentacao
+                    const entity =
+                        await this.walletRepository.findByPlayerAndCurrencyForUpdate(
+                            entityManager,
+                            playerId,
+                            currency,
+                        );
+
+                    if (!entity) {
+                        throw new NotFoundException(
+                            'Carteira não encontrada para este jogador e moeda.',
+                        );
+                    }
+
+                    const wallet = WalletMapper.toDomain(entity);
+
+                    const money = Money.from({
+                        amount,
                         currency,
-                    );
-
-                if (!entity) {
-                    throw new NotFoundException(
-                        'Carteira não encontrada para este jogador e moeda.',
-                    );
-                }
-
-                const wallet = WalletMapper.toDomain(entity);
-
-                const money = Money.from({
-                    amount,
-                    currency,
-                });
-
-                //verifica se a chave de idempotencia já foi usada
-                const existingTransaction =
-                    await this.walletTransactionRepository.findByIdempotencyKey(
-                        entityManager,
-                        idempotencyKey,
-                    );
-
-                if (existingTransaction) {
-
-                    //confere se a chave pertence a mesma operacao
-                    const sameOperation =
-                        existingTransaction.walletId === wallet.id &&
-                        existingTransaction.type === 'DEBIT' &&
-                        existingTransaction.amount === money.toJSON().amount;
-
-                    //mesma chave utilizada com dados diferentes
-                    if (!sameOperation) {
-                        throw new ConflictException(
-                            'A chave de idempotência já foi utilizada com dados diferentes.',
-                        );
-                    }
-
-                    //operacap antiga sem historico completo
-                    if (!existingTransaction.walletUpdatedAt) {
-                        throw new ConflictException(
-                            'Esta operação já foi processada, mas seu resultado histórico não está disponível.',
-                        );
-                    }
-
-                    //retorna o resultado historico sem executar outro débito
-                    return Wallet.rehydrate({
-                        id: wallet.id,
-                        playerId: wallet.playerId,
-                        currency: wallet.currency,
-                        balance: Money.from({
-                            amount: existingTransaction.balanceAfter,
-                            currency: wallet.currency,
-                        }),
-                        version: existingTransaction.versionAfter,
-                        createdAt: wallet.createdAt,
-                        updatedAt: existingTransaction.walletUpdatedAt,
                     });
-                }
 
-                //executa o debito
-                try {
-                    wallet.debit(money);
-                } catch (error) {
-                    if (
-                        error instanceof Error &&
-                        error.message ===
-                        'Saldo insuficiente para realizar a operação.'
-                    ) {
-                        throw new UnprocessableEntityException(
-                            error.message,
+                    //verifica se a chave de idempotencia ja foi usada]
+                    const existingTransaction =
+                        await this.walletTransactionRepository.findByIdempotencyKey(
+                            entityManager,
+                            idempotencyKey,
                         );
+
+                    if (existingTransaction) {
+
+                        //confere se a chave pertence a mesma operacao
+                        const sameOperation =
+                            existingTransaction.walletId === wallet.id &&
+                            existingTransaction.type === 'DEBIT' &&
+                            existingTransaction.amount === money.toJSON().amount;
+
+                        //mesma chave usada com dados diferentes
+                        if (!sameOperation) {
+                            throw new ConflictException(
+                                'A chave de idempotência já foi utilizada com dados diferentes.',
+                            );
+                        }
+
+                        //operacao antiga sem historico completo
+                        if (!existingTransaction.walletUpdatedAt) {
+                            throw new ConflictException(
+                                'Esta operação já foi processada, mas seu resultado histórico não está disponível.',
+                            );
+                        }
+
+                        //retorna o resultado historico sem executar outro debito
+                        return Wallet.rehydrate({
+                            id: wallet.id,
+                            playerId: wallet.playerId,
+                            currency: wallet.currency,
+                            balance: Money.from({
+                                amount: existingTransaction.balanceAfter,
+                                currency: wallet.currency,
+                            }),
+                            version: existingTransaction.versionAfter,
+                            createdAt: wallet.createdAt,
+                            updatedAt: existingTransaction.walletUpdatedAt,
+                        });
                     }
 
-                    throw error;
-                }
+                    //executa o debito
+                    try {
+                        wallet.debit(money);
+                    } catch (error) {
+                        if (
+                            error instanceof Error &&
+                            error.message ===
+                            'Saldo insuficiente para realizar a operação.'
+                        ) {
+                            throw new UnprocessableEntityException(
+                                error.message,
+                            );
+                        }
 
-                //atualiza o saldo da carteira
-                await this.walletRepository.updateBalance(
-                    entityManager,
-                    entity,
-                    wallet,
+                        throw error;
+                    }
+
+                    //atualiza o saldo da carteira
+                    await this.walletRepository.updateBalance(
+                        entityManager,
+                        entity,
+                        wallet,
+                    );
+
+                    //registra a movimentacao no ledger
+                    await this.walletTransactionRepository.create(
+                        entityManager,
+                        {
+                            walletId: wallet.id,
+                            type: 'DEBIT',
+                            amount: money.toJSON().amount,
+                            balanceAfter: wallet.getBalance().toJSON().amount,
+                            versionAfter: wallet.getVersion(),
+                            walletUpdatedAt: wallet.getUpdatedAt(),
+                            idempotencyKey,
+                        },
+                    );
+
+                    return wallet;
+                },
+            );
+
+        } catch (error) {
+
+            //trata conflito de chave unica no banco
+            if (error instanceof UniqueConstraintViolationException) {
+                throw new ConflictException(
+                    'A chave de idempotência já foi utilizada por outra operação.',
                 );
+            }
 
-                //registra a movimentacaoo no ledger
-                await this.walletTransactionRepository.create(
-                    entityManager,
-                    {
-                        walletId: wallet.id,
-                        type: 'DEBIT',
-                        amount: money.toJSON().amount,
-                        balanceAfter: wallet.getBalance().toJSON().amount,
-                        versionAfter: wallet.getVersion(),
-                        walletUpdatedAt: wallet.getUpdatedAt(),
-                        idempotencyKey,
-                    },
-                );
-
-                return wallet;
-            },
-        );
+            //joga os demais erros
+            throw error;
+        }
     }
-
-
 
 }

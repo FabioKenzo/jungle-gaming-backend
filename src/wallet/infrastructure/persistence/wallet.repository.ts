@@ -27,12 +27,26 @@ export class WalletRepository {
     }
 
 
+    //cria uma carteira
     async create(wallet: Wallet): Promise<void> {
         const entity = WalletMapper.toEntity(wallet);
 
         const entityManager = this.repository.getEntityManager();
 
         entityManager.persist(entity);
+        await entityManager.flush();
+    }
+
+
+    //cria uma carteira utilizando uma transacao ja iniciada
+    async createInTransaction(
+        entityManager: EntityManager,
+        wallet: Wallet,
+    ): Promise<void> {
+        const entity = WalletMapper.toEntity(wallet);
+
+        entityManager.persist(entity);
+
         await entityManager.flush();
     }
 
