@@ -5,15 +5,15 @@ services:
     container_name: jungle-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: jungle
-      POSTGRES_PASSWORD: jungle_dev
-      POSTGRES_DB: jungle_gaming
+      POSTGRES_USER: ${DB_USER:?Defina DB_USER no arquivo .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+      POSTGRES_DB: ${DB_NAME:?Defina DB_NAME no arquivo .env}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jungle -d jungle_gaming"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -29,9 +29,9 @@ services:
       NODE_ENV: production
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_USER: jungle
-      DB_PASSWORD: jungle_dev
-      DB_NAME: jungle_gaming
+      DB_USER: ${DB_USER:?Defina DB_USER no arquivo .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+      DB_NAME: ${DB_NAME:?Defina DB_NAME no arquivo .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,3 +40,4 @@ services:
 
 volumes:
   postgres_data:
+
