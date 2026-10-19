@@ -1,12 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { randomUUID } from 'node:crypto';
-
-import {
-    WageringTransactionEntity,
-    WageringTransactionType,
-    WageringTransactionStatus,
-} from './wagering-transaction.entity';
+import { WageringTransactionEntity, WageringTransactionType, WageringTransactionStatus, } from './wagering-transaction.entity';
 
 export interface CreateWageringTransaction {
     walletId: string;
@@ -95,6 +90,35 @@ export class WageringTransactionRepository {
         );
     }
 
+    async findRefundsByReference(
+        entityManager: EntityManager,
+        referenceTransactionId: string,
+    ): Promise<WageringTransactionEntity[]> {
+        return entityManager.find(
+            WageringTransactionEntity,
+            {
+                type: 'REFUND',
+                referenceTransactionId,
+                status: 'PROCESSED',
+            },
+        );
+    }
+
+    // Verifica se a transação original já sofreu ROLLBACK.
+    async findRollbackByReference(
+        entityManager: EntityManager,
+        referenceTransactionId: string,
+    ): Promise<WageringTransactionEntity | null> {
+        return entityManager.findOne(
+            WageringTransactionEntity,
+            {
+                type: 'ROLLBACK',
+                referenceTransactionId,
+                status: 'PROCESSED',
+            },
+        );
+    }
+
     async findById(
         entityManager: EntityManager,
         id: string,
@@ -105,4 +129,5 @@ export class WageringTransactionRepository {
         );
     }
 }
+
 
