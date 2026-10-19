@@ -1,5 +1,5 @@
 
-# Desafio Ténico Jungle Gaming Backend
+# Desafio Técnico Jungle Gaming Backend
 
 API REST desenvolvida como parte de um desafio técnico de backend, com foco no gerenciamento de carteiras digitais e operações financeiras relacionadas a apostas.
 
@@ -9,12 +9,12 @@ A implementação prioriza a **consistência dos dados, a rastreabilidade das op
 
 ## Tecnologias utilizadas
 
-- **TypeScript** — Linguagem
+- **TypeScript** — Linguagem de programação
 - **NestJS** — Framework para construção da API REST
 - **MikroORM** — ORM e gerenciamento de migrations
 - **PostgreSQL 16** — Banco de dados relacional
 - **Bun** — Runtime e gerenciador de dependências
-- **Docker e Docker Compose** — Containerização da aplicação
+- **Docker e Docker Compose** — Containerização da aplicação e do banco de dados
 - **Jest** — Testes automatizados
 
 ## Funcionalidades
@@ -67,6 +67,8 @@ Para executar a aplicação utilizando containers, é necessário ter instalado:
 - Docker
 - Docker Compose
 
+Não é necessário instalar Bun, NestJS ou PostgreSQL localmente para iniciar a aplicação pelo Docker.
+
 ### 1. Clonar o repositório
 
 ```bash
@@ -74,27 +76,80 @@ git clone https://github.com/FabioKenzo/jungle-gaming-backend.git
 cd jungle-gaming-backend
 ```
 
-### 2. Iniciar a aplicação
+### 2. Configurar as variáveis de ambiente
+
+O projeto utiliza variáveis de ambiente para configurar a conexão com o PostgreSQL.
+
+Um arquivo `.env.example` está disponível na raiz do repositório com as variáveis necessárias.
+
+No **Windows (CMD)**, execute:
+
+```cmd
+copy .env.example .env
+```
+
+No **Linux ou macOS**, execute:
+
+```bash
+cp .env.example .env
+```
+
+Em seguida, abra o arquivo `.env` e substitua o valor de `DB_PASSWORD` por uma senha local.
+
+Exemplo de configuração:
+
+```dotenv
+DB_USER=jungle
+DB_PASSWORD=DEFINA_SUA_SENHA_LOCAL
+DB_NAME=jungle_gaming
+DB_HOST=localhost
+DB_PORT=5433
+```
+
+**Importante:**
+
+- O arquivo `.env` contém configurações locais e não deve ser enviado ao GitHub.
+- O arquivo `.env.example` é versionado apenas como referência.
+- O Docker Compose utiliza as variáveis `DB_USER`, `DB_PASSWORD` e `DB_NAME` para configurar o PostgreSQL e a API.
+- As credenciais devem ser utilizadas exclusivamente no ambiente local de desenvolvimento e avaliação.
+
+### 3. Iniciar a aplicação
 
 ```bash
 docker compose up -d --build
 ```
 
-O Docker Compose inicializa o PostgreSQL e a API. Durante a inicialização, as migrations do MikroORM são executadas automaticamente.
+O Docker Compose realiza a construção da imagem da API e inicializa os serviços:
 
-### 3. Verificar os containers
+- PostgreSQL 16
+- API NestJS
+
+A API aguarda o PostgreSQL ficar saudável antes de iniciar.
+
+Durante a inicialização, as migrations do MikroORM são executadas automaticamente, preparando a estrutura do banco de dados.
+
+### 4. Verificar os containers
 
 ```bash
 docker compose ps
 ```
 
-### 4. Consultar os logs
+Os serviços `postgres` e `api` devem estar em execução.
+
+### 5. Consultar os logs
 
 ```bash
 docker compose logs -f api
 ```
 
-### 5. Testar a aplicação
+A inicialização bem-sucedida apresenta mensagens semelhantes a:
+
+```text
+Successfully migrated up to the latest version
+Nest application successfully started
+```
+
+### 6. Testar a aplicação
 
 A API fica disponível em:
 
@@ -114,7 +169,7 @@ Resposta esperada:
 Hello World!
 ```
 
-### 6. Encerrar os containers
+### 7. Encerrar os containers
 
 ```bash
 docker compose down
@@ -128,8 +183,6 @@ Esse comando encerra os containers sem remover o volume persistente do PostgreSQ
 |---|---|
 | API NestJS | `3000` |
 | PostgreSQL | `5433` |
-
-As credenciais de banco presentes no Docker Compose são destinadas exclusivamente ao ambiente local de desenvolvimento e avaliação.
 
 ## Endpoints
 
@@ -158,14 +211,16 @@ Os endpoints recebem os dados necessários por meio do corpo da requisição, co
 
 O projeto utiliza Jest para executar testes automatizados.
 
-Para instalar as dependências e executar os testes de ponta a ponta:
+Para instalar as dependências e executar os testes de ponta a ponta, é necessário ter o Bun instalado localmente.
+
+Com o PostgreSQL disponível e as variáveis de ambiente configuradas, execute:
 
 ```bash
 bun install
 bun run test:e2e
 ```
 
-**Observação:** a execução dos testes E2E pode exigir que o PostgreSQL esteja disponível e que as variáveis de ambiente estejam configuradas corretamente.
+**Observação:** a execução dos testes E2E depende da configuração do ambiente de testes e da disponibilidade do banco de dados.
 
 Durante o desenvolvimento, a suíte de testes E2E foi executada com sucesso, totalizando **4 suítes e 9 testes aprovados**.
 
@@ -183,8 +238,7 @@ O maior desafio foi compreender e implementar corretamente as regras de negócio
 
 Durante o desenvolvimento, aprofundei meus conhecimentos sobre transações de banco de dados, bloqueios pessimistas, integridade dos saldos e a importância de manter um histórico rastreável das movimentações.
 
-Outro aprendizado importante foi a configuração do ambiente com Docker, incluindo a inicialização da API e a execução automática das migrations em um banco de dados novo.
-
+Outro aprendizado importante foi a configuração do ambiente com Docker, incluindo a inicialização da API, o gerenciamento de variáveis de ambiente e a execução automática das migrations em um banco de dados novo.
 
 ## Possíveis evoluções
 
@@ -197,9 +251,8 @@ Como melhorias futuras, considero:
 
 Nesta versão, operações com referências ainda inexistentes podem ser registradas como `PENDING_REFERENCE`, mas sua reconciliação automática não foi implementada.
 
-
 ## Autor
 
 **Fabio Kenzo**
 
-Desenvolvedor backend com foco em Java, Spring Boot e desenvolvimento de APIs REST.
+Desenvolvedor backend com foco em Java, Spring Boot e desenvolvimento de APIs REST, expandindo conhecimentos em TypeScript e NestJS.
