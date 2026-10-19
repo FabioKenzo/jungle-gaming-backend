@@ -16,7 +16,27 @@ services:
       test: ["CMD-SHELL", "pg_isready -U jungle -d jungle_gaming"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: jungle
+      DB_PASSWORD: jungle_dev
+      DB_NAME: jungle_gaming
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "bunx --no-install mikro-orm migration:up --config ./dist/mikro-orm.config.js && bun dist/src/main.js"
 
 volumes:
   postgres_data:

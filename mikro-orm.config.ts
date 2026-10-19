@@ -22,7 +22,7 @@ export default defineConfig({
     extensions: [Migrator],
 
     migrations: {
-        path: './dist/migrations',
+        path: './dist/src/migrations',
         pathTs: './src/migrations',
         tableName: 'mikro_orm_migrations',
     },
