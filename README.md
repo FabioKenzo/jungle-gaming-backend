@@ -1,98 +1,205 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# Desafio Ténico Jungle Gaming Backend
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+API REST desenvolvida como parte de um desafio técnico de backend, com foco no gerenciamento de carteiras digitais e operações financeiras relacionadas a apostas.
 
-## Description
+O projeto permite criar e consultar carteiras, realizar movimentações de saldo e processar operações de apostas, ganhos, perdas, reembolsos e reversões.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+A implementação prioriza a **consistência dos dados, a rastreabilidade das operações, a idempotência e o controle de concorrência**.
 
-## Project setup
+## Tecnologias utilizadas
+
+- **TypeScript** — Linguagem
+- **NestJS** — Framework para construção da API REST
+- **MikroORM** — ORM e gerenciamento de migrations
+- **PostgreSQL 16** — Banco de dados relacional
+- **Bun** — Runtime e gerenciador de dependências
+- **Docker e Docker Compose** — Containerização da aplicação
+- **Jest** — Testes automatizados
+
+## Funcionalidades
+
+### Gerenciamento de carteiras
+
+- Criação de carteiras associadas a jogadores e moedas.
+- Consulta de saldo.
+- Operações de crédito e débito.
+- Registro das movimentações em um ledger para rastreabilidade.
+
+### Operações de apostas
+
+| Operação | Descrição |
+|---|---|
+| `BET` | Registra uma aposta e debita o valor da carteira. |
+| `WIN` | Registra um ganho e credita o valor na carteira. |
+| `LOSS` | Registra o resultado de perda de uma aposta. |
+| `REFUND` | Processa o reembolso de uma operação elegível. |
+| `ROLLBACK` | Realiza a reversão de uma operação anterior. |
+
+### Integridade das operações
+
+A implementação utiliza transações de banco de dados para manter a consistência entre o saldo da carteira e o histórico de movimentações.
+
+Foram aplicados mecanismos de:
+
+- **Idempotência:** evita a aplicação duplicada de operações em requisições repetidas.
+- **Controle de concorrência:** utiliza bloqueios pessimistas para proteger atualizações simultâneas de saldo.
+- **Rastreabilidade:** registra as movimentações financeiras e suas referências.
+- **Validação de entrada:** valida os dados recebidos pela API.
+
+## Arquitetura
+
+O projeto utiliza uma organização em camadas, separando as responsabilidades da aplicação.
+
+- **Controllers:** recebem as requisições HTTP e expõem os endpoints.
+- **Services:** coordenam os casos de uso e as regras de negócio.
+- **Repositories e entidades:** realizam a persistência dos dados por meio do MikroORM.
+- **DTOs:** definem e validam os dados de entrada.
+
+Essa separação busca facilitar a manutenção, os testes e a evolução das funcionalidades.
+
+## Como executar
+
+### Pré-requisitos
+
+Para executar a aplicação utilizando containers, é necessário ter instalado:
+
+- Docker
+- Docker Compose
+
+### 1. Clonar o repositório
 
 ```bash
-$ bun install
+git clone https://github.com/FabioKenzo/jungle-gaming-backend.git
+cd jungle-gaming-backend
 ```
 
-## Compile and run the project
+### 2. Iniciar a aplicação
 
 ```bash
-# development
-$ bun run start
-
-# watch mode
-$ bun run start:dev
-
-# production mode
-$ bun run start:prod
+docker compose up -d --build
 ```
 
-## Run tests
+O Docker Compose inicializa o PostgreSQL e a API. Durante a inicialização, as migrations do MikroORM são executadas automaticamente.
+
+### 3. Verificar os containers
 
 ```bash
-# unit tests
-$ bun run test
-
-# e2e tests
-$ bun run test:e2e
-
-# test coverage
-$ bun run test:cov
+docker compose ps
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 4. Consultar os logs
 
 ```bash
-$ bun install -g @nestjs/mau
-$ mau deploy
+docker compose logs -f api
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 5. Testar a aplicação
 
-## Resources
+A API fica disponível em:
 
-Check out a few resources that may come in handy when working with NestJS:
+```text
+http://localhost:3000
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Para verificar se está respondendo:
 
-## Support
+```bash
+curl http://localhost:3000/
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Resposta esperada:
 
-## Stay in touch
+```text
+Hello World!
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### 6. Encerrar os containers
 
-## License
+```bash
+docker compose down
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Esse comando encerra os containers sem remover o volume persistente do PostgreSQL.
+
+### Portas utilizadas
+
+| Serviço | Porta local |
+|---|---|
+| API NestJS | `3000` |
+| PostgreSQL | `5433` |
+
+As credenciais de banco presentes no Docker Compose são destinadas exclusivamente ao ambiente local de desenvolvimento e avaliação.
+
+## Endpoints
+
+### Carteiras
+
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `POST` | `/wallets` | Criar carteira |
+| `GET` | `/wallets/:playerId/:currency` | Consultar carteira |
+| `POST` | `/wallets/:playerId/:currency/credit` | Creditar saldo |
+| `POST` | `/wallets/:playerId/:currency/debit` | Debitar saldo |
+
+### Apostas e transações
+
+| Método | Endpoint | Descrição |
+|---|---|---|
+| `POST` | `/wagering/bet` | Registrar aposta |
+| `POST` | `/wagering/win` | Registrar ganho |
+| `POST` | `/wagering/loss` | Registrar perda |
+| `POST` | `/wagering/refund` | Processar reembolso |
+| `POST` | `/wagering/rollback` | Reverter uma operação |
+
+Os endpoints recebem os dados necessários por meio do corpo da requisição, conforme os DTOs definidos na aplicação.
+
+## Testes automatizados
+
+O projeto utiliza Jest para executar testes automatizados.
+
+Para instalar as dependências e executar os testes de ponta a ponta:
+
+```bash
+bun install
+bun run test:e2e
+```
+
+**Observação:** a execução dos testes E2E pode exigir que o PostgreSQL esteja disponível e que as variáveis de ambiente estejam configuradas corretamente.
+
+Durante o desenvolvimento, a suíte de testes E2E foi executada com sucesso, totalizando **4 suítes e 9 testes aprovados**.
+
+Também foram realizados testes manuais de operações como `REFUND` e `ROLLBACK`, incluindo a verificação do saldo e das movimentações persistidas no banco de dados.
+
+Além disso, a aplicação foi validada em um ambiente Docker isolado, utilizando um volume PostgreSQL vazio, para verificar a execução automática das migrations e a inicialização da API.
+
+## Principais desafios e aprendizados
+
+Este foi meu primeiro projeto desenvolvido com **NestJS e MikroORM**.
+
+Minha experiência anterior está concentrada principalmente no desenvolvimento backend com **Java e Spring Boot**, o que facilitou a adaptação a conceitos como injeção de dependências, organização em camadas, controllers, services e persistência de dados.
+
+O maior desafio foi compreender e implementar corretamente as regras de negócio relacionadas às movimentações financeiras, principalmente nos cenários que envolvem **idempotência, concorrência, reembolso e reversão de operações**.
+
+Durante o desenvolvimento, aprofundei meus conhecimentos sobre transações de banco de dados, bloqueios pessimistas, integridade dos saldos e a importância de manter um histórico rastreável das movimentações.
+
+Outro aprendizado importante foi a configuração do ambiente com Docker, incluindo a inicialização da API e a execução automática das migrations em um banco de dados novo.
+
+
+## Possíveis evoluções
+
+Como melhorias futuras, considero:
+
+- **Mensageria com Amazon SQS:** implementar o processamento assíncrono de eventos e operações, reduzindo o acoplamento entre componentes. Atualmente estou aprofundando meus conhecimentos em mensageria utilizando Apache Kafka, com o objetivo de aplicar esses conceitos em integrações com serviços como o Amazon SQS.
+- **Reconciliação automática:** implementar o processamento de operações registradas como `PENDING_REFERENCE` quando suas transações de referência estiverem disponíveis.
+- **Ampliação dos testes automatizados:** adicionar mais cenários de concorrência, reembolso, reversão e falhas transacionais.
+- **Observabilidade:** implementar logs estruturados, métricas e mecanismos de monitoramento.
+
+Nesta versão, operações com referências ainda inexistentes podem ser registradas como `PENDING_REFERENCE`, mas sua reconciliação automática não foi implementada.
+
+
+## Autor
+
+**Fabio Kenzo**
+
+Desenvolvedor backend com foco em Java, Spring Boot e desenvolvimento de APIs REST.
